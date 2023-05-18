@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -309,6 +310,7 @@ func decodeGrpcMessageUnchecked(msg string) string {
 }
 
 type bufWriter struct {
+	pool      *sync.Pool
 	buf       []byte
 	offset    int
 	batchSize int
@@ -316,11 +318,11 @@ type bufWriter struct {
 	err       error
 }
 
-func newBufWriter(conn net.Conn, batchSize int) *bufWriter {
+func newBufWriter(conn net.Conn, batchSize int, pool *sync.Pool) *bufWriter {
 	return &bufWriter{
-		buf:       make([]byte, batchSize*2),
 		batchSize: batchSize,
 		conn:      conn,
+		pool:      pool,
 	}
 }
 
@@ -332,19 +334,33 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		n, err = w.conn.Write(b)
 		return n, toIOError(err)
 	}
+	if w.buf == nil {
+		b := w.pool.Get().(*[]byte)
+		w.buf = *b
+	}
 	for len(b) > 0 {
-		nn := copy(w.buf[w.offset:], b)
+		nn := copy((w.buf)[w.offset:], b)
 		b = b[nn:]
 		w.offset += nn
 		n += nn
 		if w.offset >= w.batchSize {
-			err = w.Flush()
+			err = w.flush()
 		}
 	}
 	return n, err
 }
 
 func (w *bufWriter) Flush() error {
+	err := w.flush()
+	if w.buf != nil {
+		b := w.buf
+		w.pool.Put(&b)
+		w.buf = nil
+	}
+	return err
+}
+
+func (w *bufWriter) flush() error {
 	if w.err != nil {
 		return w.err
 	}
@@ -381,6 +397,9 @@ type framer struct {
 	fr     *http2.Framer
 }
 
+var poolMap map[int]*sync.Pool = make(map[int]*sync.Pool)
+var mutex sync.Mutex
+
 func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, maxHeaderListSize uint32) *framer {
 	if writeBufferSize < 0 {
 		writeBufferSize = 0
@@ -389,7 +408,19 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, maxHeaderList
 	if readBufferSize > 0 {
 		r = bufio.NewReaderSize(r, readBufferSize)
 	}
-	w := newBufWriter(conn, writeBufferSize)
+	mutex.Lock()
+	pool, ok := poolMap[writeBufferSize*2]
+	if !ok {
+		pool = &sync.Pool{
+			New: func() interface{} {
+				b := make([]byte, writeBufferSize*2)
+				return &b
+			},
+		}
+		poolMap[writeBufferSize*2] = pool
+	}
+	mutex.Unlock()
+	w := newBufWriter(conn, writeBufferSize, pool)
 	f := &framer{
 		writer: w,
 		fr:     http2.NewFramer(w, r),
