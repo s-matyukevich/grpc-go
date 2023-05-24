@@ -530,6 +530,7 @@ func runBenchmark(caller rpcCallFunc, start startFunc, stop stopFunc, bf stats.F
 				}
 			}(cn, i)
 		}
+		log.Printf("cn %d done\n", cn)
 	}
 	wg.Wait()
 	stop(count)
