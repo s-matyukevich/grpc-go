@@ -246,6 +246,10 @@ func DoUnaryCall(tc testgrpc.BenchmarkServiceClient, reqSize, respSize int) erro
 		Payload:      pl,
 	}
 	if _, err := tc.UnaryCall(context.Background(), req); err != nil {
+		if status.Code(err) == codes.Unavailable {
+			log.Printf("---/BenchmarkService/UnaryCall(_, _) = _, %v, want _, <nil>", err)
+			return nil
+		}
 		return fmt.Errorf("/BenchmarkService/UnaryCall(_, _) = _, %v, want _, <nil>", err)
 	}
 	return nil
