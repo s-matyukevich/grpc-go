@@ -266,6 +266,7 @@ func unconstrainedStreamBenchmark(start startFunc, stop ucStopFunc, bf stats.Fea
 				}
 			}(cn, i)
 		}
+		fmt.Printf("cn %d done\n", cn)
 	}
 	wg.Wait()
 	stop(req, resp)
@@ -530,7 +531,6 @@ func runBenchmark(caller rpcCallFunc, start startFunc, stop stopFunc, bf stats.F
 				}
 			}(cn, i)
 		}
-		fmt.Printf("cn %d done\n", cn)
 	}
 	wg.Wait()
 	stop(count)
