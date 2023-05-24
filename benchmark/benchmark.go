@@ -158,7 +158,7 @@ func (s *testServer) UnconstrainedStreamingCall(stream testgrpc.BenchmarkService
 			err := stream.Send(response)
 			switch status.Code(err) {
 			case codes.Unavailable, codes.Canceled:
-				log.Printf("---code%v %v\n", status.Code(err), err)
+				fmt.Printf("---code%v %v\n", status.Code(err), err)
 				return
 			case codes.OK:
 			default:
@@ -248,7 +248,7 @@ func DoUnaryCall(tc testgrpc.BenchmarkServiceClient, reqSize, respSize int) erro
 	}
 	if _, err := tc.UnaryCall(context.Background(), req); err != nil {
 		if status.Code(err) == codes.Unavailable {
-			log.Printf("---/BenchmarkService/UnaryCall(_, _) = _, %v, want _, <nil>\n", err)
+			fmt.Printf("---/BenchmarkService/UnaryCall(_, _) = _, %v, want _, <nil>\n", err)
 			return nil
 		}
 		return fmt.Errorf("/BenchmarkService/UnaryCall(_, _) = _, %v, want _, <nil>", err)
