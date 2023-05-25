@@ -157,7 +157,7 @@ func (s *testServer) UnconstrainedStreamingCall(stream testgrpc.BenchmarkService
 			}
 			err := stream.Send(response)
 			switch status.Code(err) {
-			case codes.Unavailable:
+			case codes.Unavailable, codes.Canceled:
 				return
 			case codes.OK:
 			default:
@@ -233,7 +233,7 @@ func StartServer(info ServerInfo, opts ...grpc.ServerOption) func() {
 	}
 	go s.Serve(info.Listener)
 	return func() {
-		s.GracefulStop()
+		s.Stop()
 	}
 }
 
