@@ -19,7 +19,6 @@
 package transport
 
 import (
-	"bufio"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -411,9 +410,9 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, shareWriteBuf
 		writeBufferSize = 0
 	}
 	var r io.Reader = conn
-	if readBufferSize > 0 {
-		r = bufio.NewReaderSize(r, readBufferSize)
-	}
+	//if readBufferSize > 0 {
+	//	r = bufio.NewReaderSize(r, readBufferSize)
+	//}
 	pool := getWriteBufferPool(writeBufferSize, shareWriteBuffer)
 	w := newBufWriter(conn, writeBufferSize, pool)
 	f := &framer{
