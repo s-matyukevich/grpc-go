@@ -59,6 +59,7 @@ const (
 	SleepBetweenRPCs
 	RecvBufferPool
 	ShareWriteBuffer
+	ShareReadBuffer
 
 	// MaxFeatureIndex is a place holder to indicate the total number of feature
 	// indices we have. Any new feature indices should be added above this.
@@ -132,6 +133,8 @@ type Features struct {
 	RecvBufferPool string
 	// ShareWriteBuffer configures whether both client and server share per-connection write buffer
 	ShareWriteBuffer bool
+	// ShareReadBuffer configures whether both client and server share per-connection read buffer
+	ShareReadBuffer bool
 }
 
 // String returns all the feature values as a string.
@@ -151,13 +154,13 @@ func (f Features) String() string {
 		"trace_%v-latency_%v-kbps_%v-MTU_%v-maxConcurrentCalls_%v-%s-%s-"+
 		"compressor_%v-channelz_%v-preloader_%v-clientReadBufferSize_%v-"+
 		"clientWriteBufferSize_%v-serverReadBufferSize_%v-serverWriteBufferSize_%v-"+
-		"sleepBetweenRPCs_%v-connections_%v-recvBufferPool_%v-shareWriteBuffer_%v",
+		"sleepBetweenRPCs_%v-connections_%v-recvBufferPool_%v-shareWriteBuffer_%v-shareReadBuffer_%v",
 		f.NetworkMode, f.UseBufConn, f.EnableKeepalive, f.BenchTime, f.EnableTrace,
 		f.Latency, f.Kbps, f.MTU, f.MaxConcurrentCalls, reqPayloadString,
 		respPayloadString, f.ModeCompressor, f.EnableChannelz, f.EnablePreloader,
 		f.ClientReadBufferSize, f.ClientWriteBufferSize, f.ServerReadBufferSize,
 		f.ServerWriteBufferSize, f.SleepBetweenRPCs, f.Connections,
-		f.RecvBufferPool, f.ShareWriteBuffer)
+		f.RecvBufferPool, f.ShareWriteBuffer, f.ShareReadBuffer)
 }
 
 // SharedFeatures returns the shared features as a pretty printable string.

@@ -171,6 +171,7 @@ type serverOptions struct {
 	writeBufferSize       int
 	readBufferSize        int
 	shareWriteBuffer      bool
+	shareReadBuffer       bool
 	connectionTimeout     time.Duration
 	maxHeaderListSize     *uint32
 	headerTableSize       *uint32
@@ -242,6 +243,15 @@ func newJoinServerOption(opts ...ServerOption) ServerOption {
 func ShareWriteBuffer(val bool) ServerOption {
 	return newFuncServerOption(func(o *serverOptions) {
 		o.shareWriteBuffer = val
+	})
+}
+
+// ShareReadBuffer allows reusing per-connection transport write buffer.
+// If this option is set to true every connection will release the buffer when
+// it got empty.
+func ShareReadBuffer(val bool) ServerOption {
+	return newFuncServerOption(func(o *serverOptions) {
+		o.shareReadBuffer = val
 	})
 }
 
@@ -949,6 +959,7 @@ func (s *Server) newHTTP2Transport(c net.Conn) transport.ServerTransport {
 		WriteBufferSize:       s.opts.writeBufferSize,
 		ReadBufferSize:        s.opts.readBufferSize,
 		ShareWriteBuffer:      s.opts.shareWriteBuffer,
+		ShareReadBuffer:       s.opts.shareReadBuffer,
 		ChannelzParentID:      s.channelzID,
 		MaxHeaderListSize:     s.opts.maxHeaderListSize,
 		HeaderTableSize:       s.opts.headerTableSize,
