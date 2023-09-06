@@ -58,8 +58,8 @@ const (
 	ServerWriteBufferSize
 	SleepBetweenRPCs
 	RecvBufferPool
-	ShareWriteBuffer
-	ShareReadBuffer
+	SharedWriteBuffer
+	SharedReadBuffer
 
 	// MaxFeatureIndex is a place holder to indicate the total number of feature
 	// indices we have. Any new feature indices should be added above this.
@@ -131,10 +131,10 @@ type Features struct {
 	SleepBetweenRPCs time.Duration
 	// RecvBufferPool represents the shared recv buffer pool used.
 	RecvBufferPool string
-	// ShareWriteBuffer configures whether both client and server share per-connection write buffer
-	ShareWriteBuffer bool
-	// ShareReadBuffer configures whether both client and server share per-connection read buffer
-	ShareReadBuffer bool
+	// SharedWriteBuffer configures whether both client and server share per-connection write buffer
+	SharedWriteBuffer bool
+	// SharedReadBuffer configures whether both client and server share per-connection read buffer
+	SharedReadBuffer bool
 }
 
 // String returns all the feature values as a string.
@@ -154,13 +154,13 @@ func (f Features) String() string {
 		"trace_%v-latency_%v-kbps_%v-MTU_%v-maxConcurrentCalls_%v-%s-%s-"+
 		"compressor_%v-channelz_%v-preloader_%v-clientReadBufferSize_%v-"+
 		"clientWriteBufferSize_%v-serverReadBufferSize_%v-serverWriteBufferSize_%v-"+
-		"sleepBetweenRPCs_%v-connections_%v-recvBufferPool_%v-shareWriteBuffer_%v-shareReadBuffer_%v",
+		"sleepBetweenRPCs_%v-connections_%v-recvBufferPool_%v-sharedWriteBuffer_%v-sharedReadBuffer_%v",
 		f.NetworkMode, f.UseBufConn, f.EnableKeepalive, f.BenchTime, f.EnableTrace,
 		f.Latency, f.Kbps, f.MTU, f.MaxConcurrentCalls, reqPayloadString,
 		respPayloadString, f.ModeCompressor, f.EnableChannelz, f.EnablePreloader,
 		f.ClientReadBufferSize, f.ClientWriteBufferSize, f.ServerReadBufferSize,
 		f.ServerWriteBufferSize, f.SleepBetweenRPCs, f.Connections,
-		f.RecvBufferPool, f.ShareWriteBuffer, f.ShareReadBuffer)
+		f.RecvBufferPool, f.SharedWriteBuffer, f.SharedReadBuffer)
 }
 
 // SharedFeatures returns the shared features as a pretty printable string.
@@ -236,8 +236,10 @@ func (f Features) partialString(b *bytes.Buffer, wantFeatures []bool, sep, delim
 				b.WriteString(fmt.Sprintf("SleepBetweenRPCs%v%v%v", sep, f.SleepBetweenRPCs, delim))
 			case RecvBufferPool:
 				b.WriteString(fmt.Sprintf("RecvBufferPool%v%v%v", sep, f.RecvBufferPool, delim))
-			case ShareWriteBuffer:
-				b.WriteString(fmt.Sprintf("ShareWriteBuffer%v%v%v", sep, f.ShareWriteBuffer, delim))
+			case SharedWriteBuffer:
+				b.WriteString(fmt.Sprintf("SharedWriteBuffer%v%v%v", sep, f.SharedWriteBuffer, delim))
+			case SharedReadBuffer:
+				b.WriteString(fmt.Sprintf("SharedReadBuffer%v%v%v", sep, f.SharedReadBuffer, delim))
 			default:
 				log.Fatalf("Unknown feature index %v. maxFeatureIndex is %v", i, MaxFeatureIndex)
 			}

@@ -349,14 +349,14 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		w.offset += nn
 		n += nn
 		if w.offset >= w.batchSize {
-			err = w.flush()
+			err = w.flushKeepBuffer()
 		}
 	}
 	return n, err
 }
 
 func (w *bufWriter) Flush() error {
-	err := w.flush()
+	err := w.flushKeepBuffer()
 	// Only release the buffer if we are in a "shared" mode
 	if w.buf != nil && w.pool != nil {
 		b := w.buf
@@ -366,7 +366,7 @@ func (w *bufWriter) Flush() error {
 	return err
 }
 
-func (w *bufWriter) flush() error {
+func (w *bufWriter) flushKeepBuffer() error {
 	if w.err != nil {
 		return w.err
 	}
@@ -440,27 +440,26 @@ var writeBufferMutex sync.Mutex
 var readBufferPoolMap map[int]*sync.Pool = make(map[int]*sync.Pool)
 var readBufferMutex sync.Mutex
 
-func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, shareWriteBuffer bool, shareReadBuffer bool, maxHeaderListSize uint32) *framer {
+func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, sharedWriteBuffer bool, sharedReadBuffer bool, maxHeaderListSize uint32) *framer {
 	if writeBufferSize < 0 {
 		writeBufferSize = 0
 	}
 
 	writeBufferSize *= 2
-	writePool := getBufferPool(writeBufferPoolMap, &writeBufferMutex, writeBufferSize, shareWriteBuffer, func() interface{} {
+	writePool := getBufferPool(writeBufferPoolMap, &writeBufferMutex, writeBufferSize, sharedWriteBuffer, func() interface{} {
 		b := make([]byte, writeBufferSize)
 		return &b
 	})
 	w := newBufWriter(conn, writeBufferSize, writePool)
 
 	var r io.Reader
-	t := 0
 	if readBufferSize > 0 {
-		readPool := getBufferPool(readBufferPoolMap, &readBufferMutex, readBufferSize, shareReadBuffer, func() interface{} {
-			t++
+		readPool := getBufferPool(readBufferPoolMap, &readBufferMutex, readBufferSize, sharedReadBuffer, func() interface{} {
 			return bufio.NewReaderSize(conn, readBufferSize)
 		})
 		r = newBufReader(conn, readBufferSize, readPool)
 	}
+
 	f := &framer{
 		writer: w,
 		fr:     http2.NewFramer(w, r),
