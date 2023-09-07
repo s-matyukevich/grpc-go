@@ -19,6 +19,7 @@
 package orca
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -54,7 +55,7 @@ func (s) TestServerMetrics_Setters(t *testing.T) {
 		RequestCost:    map[string]float64{},
 	}
 
-	got := smr.ServerMetrics()
+	got := smr.ServerMetrics(context.Background())
 	if d := cmp.Diff(got, want); d != "" {
 		t.Fatalf("unexpected server metrics: -got +want: %v", d)
 	}
@@ -90,7 +91,7 @@ func (s) TestServerMetrics_Deleters(t *testing.T) {
 		RequestCost:    map[string]float64{},
 	}
 
-	got := smr.ServerMetrics()
+	got := smr.ServerMetrics(context.Background())
 	if d := cmp.Diff(got, want); d != "" {
 		t.Fatalf("unexpected server metrics: -got +want: %v", d)
 	}
@@ -129,7 +130,7 @@ func (s) TestServerMetrics_Setters_Range(t *testing.T) {
 		RequestCost:    map[string]float64{},
 	}
 
-	got := smr.ServerMetrics()
+	got := smr.ServerMetrics(context.Background())
 	if d := cmp.Diff(got, want); d != "" {
 		t.Fatalf("unexpected server metrics: -got +want: %v", d)
 	}

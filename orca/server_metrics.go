@@ -19,9 +19,15 @@
 package orca
 
 import (
+	"context"
 	"sync"
 
 	v3orcapb "github.com/cncf/xds/go/xds/data/orca/v3"
+	"google.golang.org/grpc/metadata"
+)
+
+const (
+	ClientTypeMDField = "client_type"
 )
 
 // ServerMetrics is the data returned from a server to a client to describe the
@@ -141,9 +147,12 @@ type ServerMetricsRecorder interface {
 	DeleteNamedUtilization(name string)
 }
 
+type PerClientModifier func(*ServerMetrics, string) *ServerMetrics
+
 type serverMetricsRecorder struct {
-	mu    sync.Mutex     // protects state
-	state *ServerMetrics // the current metrics
+	mu                sync.Mutex     // protects state
+	state             *ServerMetrics // the current metrics
+	perClientModifier PerClientModifier
 }
 
 // NewServerMetricsRecorder returns an in-memory store for ServerMetrics and
@@ -151,6 +160,11 @@ type serverMetricsRecorder struct {
 // ServerMetricsProvider for use with NewService.
 func NewServerMetricsRecorder() ServerMetricsRecorder {
 	return newServerMetricsRecorder()
+}
+func NewServerMetricsRecorderWithPerClientModifier(perClientModifier PerClientModifier) ServerMetricsRecorder {
+	r := newServerMetricsRecorder()
+	r.perClientModifier = perClientModifier
+	return r
 }
 
 func newServerMetricsRecorder() *serverMetricsRecorder {
@@ -169,10 +183,10 @@ func newServerMetricsRecorder() *serverMetricsRecorder {
 }
 
 // ServerMetrics returns a copy of the current ServerMetrics.
-func (s *serverMetricsRecorder) ServerMetrics() *ServerMetrics {
+func (s *serverMetricsRecorder) ServerMetrics(ctx context.Context) *ServerMetrics {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &ServerMetrics{
+	m := &ServerMetrics{
 		CPUUtilization: s.state.CPUUtilization,
 		MemUtilization: s.state.MemUtilization,
 		AppUtilization: s.state.AppUtilization,
@@ -182,6 +196,15 @@ func (s *serverMetricsRecorder) ServerMetrics() *ServerMetrics {
 		RequestCost:    copyMap(s.state.RequestCost),
 		NamedMetrics:   copyMap(s.state.NamedMetrics),
 	}
+	if s.perClientModifier != nil {
+		md, ok := metadata.FromIncomingContext(ctx)
+		clientType := ""
+		if ok && len(md.Get(ClientTypeMDField)) > 0 {
+			clientType = md.Get(ClientTypeMDField)[0]
+		}
+		return s.perClientModifier(m, clientType)
+	}
+	return m
 }
 
 func copyMap(m map[string]float64) map[string]float64 {

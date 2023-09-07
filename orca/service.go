@@ -19,6 +19,7 @@
 package orca
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -86,7 +87,7 @@ type ServerMetricsProvider interface {
 	// ServerMetrics returns the current set of server metrics.  It should
 	// return a read-only, immutable copy of the data that is active at the
 	// time of the call.
-	ServerMetrics() *ServerMetrics
+	ServerMetrics(ctx context.Context) *ServerMetrics
 }
 
 // NewService creates a new ORCA service implementation configured using the
@@ -140,7 +141,7 @@ func (s *Service) determineReportingInterval(req *v3orcaservicepb.OrcaLoadReport
 }
 
 func (s *Service) sendMetricsResponse(stream v3orcaservicegrpc.OpenRcaService_StreamCoreMetricsServer) error {
-	return stream.Send(s.smProvider.ServerMetrics().toLoadReportProto())
+	return stream.Send(s.smProvider.ServerMetrics(stream.Context()).toLoadReportProto())
 }
 
 // StreamCoreMetrics streams custom backend metrics injected by the server

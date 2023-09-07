@@ -91,10 +91,10 @@ func (rw *recorderWrapper) recorder() CallMetricsRecorder {
 func (rw *recorderWrapper) setTrailerMetadata(ctx context.Context) {
 	var sm *ServerMetrics
 	if rw.smp != nil {
-		sm = rw.smp.ServerMetrics()
-		sm.merge(rw.r.ServerMetrics())
+		sm = rw.smp.ServerMetrics(ctx)
+		sm.merge(rw.r.ServerMetrics(ctx))
 	} else {
-		sm = rw.r.ServerMetrics()
+		sm = rw.r.ServerMetrics(ctx)
 	}
 
 	b, err := proto.Marshal(sm.toLoadReportProto())
