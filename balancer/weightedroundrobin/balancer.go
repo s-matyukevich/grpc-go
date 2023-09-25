@@ -454,7 +454,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	defer w.mu.Unlock()
 
 	w.pidController.Update(pid.ControllerInput{
-		ReferenceSignal:  0.6,
+		ReferenceSignal:  1.0,
 		ActualSignal:     utilization,
 		SamplingInterval: time.Since(w.lastUpdated),
 	})
