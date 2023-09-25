@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -53,12 +54,15 @@ func init() {
 type bb struct{}
 
 func (bb) Build(cc balancer.ClientConn, bOpts balancer.BuildOptions) balancer.Balancer {
+	mean := &atomic.Uint64{}
+	mean.Store(math.Float64bits(1.0))
 	b := &wrrBalancer{
 		cc:                cc,
 		subConns:          resolver.NewAddressMap(),
 		csEvltr:           &balancer.ConnectivityStateEvaluator{},
 		scMap:             make(map[balancer.SubConn]*weightedSubConn),
 		connectivityState: connectivity.Connecting,
+		meanUtilization:   mean,
 	}
 	b.logger = prefixLogger(b)
 	b.logger.Infof("Created")
@@ -115,6 +119,7 @@ type wrrBalancer struct {
 	resolverErr       error // the last error reported by the resolver; cleared on successful resolution
 	connErr           error // the last connection error; cleared upon leaving TransientFailure
 	stopPicker        func()
+	meanUtilization   *atomic.Uint64
 }
 
 func (b *wrrBalancer) UpdateClientConnState(ccs balancer.ClientConnState) error {
@@ -172,13 +177,18 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				// Initially, we set load reports to off, because they are not
 				// running upon initial weightedSubConn creation.
 				cfg: &lbConfig{EnableOOBLoadReport: false},
-				pidController: &pid.Controller{
-					Config: pid.ControllerConfig{
-						ProportionalGain: 2.0,
-						IntegralGain:     1.0,
-						DerivativeGain:   1.0,
+				pidController: &pid.AntiWindupController{
+					Config: pid.AntiWindupControllerConfig{
+						ProportionalGain:              2,
+						IntegralGain:                  1,
+						DerivativeGain:                1,
+						AntiWindUpGain:                1,
+						IntegralDischargeTimeConstant: 10.0,
+						MinOutput:                     -math.MaxFloat64,
+						MaxOutput:                     math.MaxFloat64,
 					},
 				},
+				meanUtilization: b.meanUtilization,
 			}
 			b.subConns.Set(addr, wsc)
 			b.scMap[sc] = wsc
@@ -326,9 +336,10 @@ func (b *wrrBalancer) regeneratePicker() {
 	}
 
 	p := &picker{
-		v:        grpcrand.Uint32(), // start the scheduler at a random point
-		cfg:      b.cfg,
-		subConns: b.readySubConns(),
+		v:               grpcrand.Uint32(), // start the scheduler at a random point
+		cfg:             b.cfg,
+		subConns:        b.readySubConns(),
+		meanUtilization: b.meanUtilization,
 	}
 	var ctx context.Context
 	ctx, b.stopPicker = context.WithCancel(context.Background())
@@ -343,10 +354,11 @@ func (b *wrrBalancer) regeneratePicker() {
 // update the scheduler periodically and ensure picks are routed proportional
 // to those weights.
 type picker struct {
-	scheduler unsafe.Pointer     // *scheduler; accessed atomically
-	v         uint32             // incrementing value used by the scheduler; accessed atomically
-	cfg       *lbConfig          // active config when picker created
-	subConns  []*weightedSubConn // all READY subconns
+	scheduler       unsafe.Pointer     // *scheduler; accessed atomically
+	v               uint32             // incrementing value used by the scheduler; accessed atomically
+	cfg             *lbConfig          // active config when picker created
+	subConns        []*weightedSubConn // all READY subconns
+	meanUtilization *atomic.Uint64
 }
 
 // scWeights returns a slice containing the weights from p.subConns in the same
@@ -369,6 +381,15 @@ func (p *picker) regenerateScheduler() {
 	atomic.StorePointer(&p.scheduler, unsafe.Pointer(&s))
 }
 
+func (p *picker) updateMeanUtilization() {
+	mean := 0.0
+	for _, wsc := range p.subConns {
+		mean = wsc.getLastUtilization()
+	}
+	mean /= float64(len(p.subConns))
+	p.meanUtilization.Store(math.Float64bits(mean))
+}
+
 func (p *picker) start(ctx context.Context) {
 	p.regenerateScheduler()
 	if len(p.subConns) == 1 {
@@ -383,6 +404,7 @@ func (p *picker) start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				p.updateMeanUtilization()
 				p.regenerateScheduler()
 			}
 		}
@@ -420,18 +442,20 @@ type weightedSubConn struct {
 	connectivityState connectivity.State
 	stopORCAListener  func()
 
-	pidController *pid.Controller
+	pidController   *pid.AntiWindupController
+	meanUtilization *atomic.Uint64
 
 	// The following fields are accessed asynchronously and are protected by
 	// mu.  Note that mu may not be held when calling into the stopORCAListener
 	// or when registering a new listener, as those calls require the ORCA
 	// producer mu which is held when calling the listener, and the listener
 	// holds mu.
-	mu            sync.Mutex
-	weightVal     float64
-	nonEmptySince time.Time
-	lastUpdated   time.Time
-	cfg           *lbConfig
+	mu              sync.Mutex
+	weightVal       float64
+	lastUtilization float64
+	nonEmptySince   time.Time
+	lastUpdated     time.Time
+	cfg             *lbConfig
 }
 
 func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
@@ -453,21 +477,26 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	w.pidController.Update(pid.ControllerInput{
-		ReferenceSignal:  1.0,
+	meanUtilization := w.meanUtilization.Load()
+	w.pidController.Update(pid.AntiWindupControllerInput{
+		ReferenceSignal:  math.Float64frombits(meanUtilization),
 		ActualSignal:     utilization,
 		SamplingInterval: time.Since(w.lastUpdated),
 	})
 
 	w.weightVal = w.pidController.State.ControlSignal
+	w.lastUtilization = utilization
 	if w.logger.V(2) {
 		w.logger.Infof("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
+		w.logger.Errorf("PID state %+v", w.pidController.State)
 	}
 
+	w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
 	w.lastUpdated = internal.TimeNow()
 	if w.nonEmptySince == (time.Time{}) {
 		w.nonEmptySince = w.lastUpdated
 	}
+
 }
 
 // updateConfig updates the parameters of the WRR policy and
@@ -559,4 +588,11 @@ func (w *weightedSubConn) weight(now time.Time, weightExpirationPeriod, blackout
 		return 0
 	}
 	return w.weightVal
+}
+
+func (w *weightedSubConn) getLastUtilization() float64 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.lastUtilization
 }
