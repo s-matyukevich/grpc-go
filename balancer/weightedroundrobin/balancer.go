@@ -494,11 +494,9 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 		w.weightVal = -1.0 / (w.pidController.State.ControlSignal - 1.0)
 	}
 	w.lastUtilization = utilization
-	if w.logger.V(2) {
-		w.logger.Infof("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
-		w.logger.Infof("PID state %+v", w.pidController.State)
-		w.logger.Infof("Mean utilization %v", meanUtilization)
-	}
+	w.logger.Errorf("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
+	w.logger.Errorf("PID state %+v", w.pidController.State)
+	w.logger.Errorf("Mean utilization %v", meanUtilization)
 
 	w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
 	w.lastUpdated = internal.TimeNow()
