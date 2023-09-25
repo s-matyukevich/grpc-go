@@ -184,6 +184,7 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 						DerivativeGain:                1,
 						AntiWindUpGain:                1,
 						IntegralDischargeTimeConstant: 10.0,
+						LowPassTimeConstant:           100 * time.Millisecond,
 						MinOutput:                     -math.MaxFloat64,
 						MaxOutput:                     math.MaxFloat64,
 					},
