@@ -485,6 +485,11 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	})
 
 	w.weightVal = w.pidController.State.ControlSignal
+	if w.pidController.State.ControlSignal >= 0 {
+		w.weightVal = 1.0 + w.pidController.State.ControlSignal
+	} else {
+		w.weightVal = -1.0 / (w.pidController.State.ControlSignal - 1.0)
+	}
 	w.lastUtilization = utilization
 	if w.logger.V(2) {
 		w.logger.Infof("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
