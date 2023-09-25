@@ -40,6 +40,7 @@ import (
 	"google.golang.org/grpc/serviceconfig"
 
 	v3orcapb "github.com/cncf/xds/go/xds/data/orca/v3"
+	"go.einride.tech/pid"
 )
 
 // Name is the name of the weighted round robin balancer.
@@ -171,6 +172,13 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				// Initially, we set load reports to off, because they are not
 				// running upon initial weightedSubConn creation.
 				cfg: &lbConfig{EnableOOBLoadReport: false},
+				pidController: &pid.Controller{
+					Config: pid.ControllerConfig{
+						ProportionalGain: 2.0,
+						IntegralGain:     1.0,
+						DerivativeGain:   1.0,
+					},
+				},
 			}
 			b.subConns.Set(addr, wsc)
 			b.scMap[sc] = wsc
@@ -412,6 +420,8 @@ type weightedSubConn struct {
 	connectivityState connectivity.State
 	stopORCAListener  func()
 
+	pidController *pid.Controller
+
 	// The following fields are accessed asynchronously and are protected by
 	// mu.  Note that mu may not be held when calling into the stopORCAListener
 	// or when registering a new listener, as those calls require the ORCA
@@ -443,8 +453,13 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	errorRate := load.Eps / load.RpsFractional
-	w.weightVal = load.RpsFractional / (utilization + errorRate*w.cfg.ErrorUtilizationPenalty)
+	w.pidController.Update(pid.ControllerInput{
+		ReferenceSignal:  0.6,
+		ActualSignal:     utilization,
+		SamplingInterval: time.Since(w.lastUpdated),
+	})
+
+	w.weightVal = w.pidController.State.ControlSignal
 	if w.logger.V(2) {
 		w.logger.Infof("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
 	}
