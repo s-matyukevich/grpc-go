@@ -382,6 +382,9 @@ func (p *picker) regenerateScheduler() {
 }
 
 func (p *picker) updateMeanUtilization() {
+	if len(p.subConns) == 0 {
+		return
+	}
 	mean := 0.0
 	for _, wsc := range p.subConns {
 		mean = wsc.getLastUtilization()
@@ -477,9 +480,9 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	meanUtilization := w.meanUtilization.Load()
+	meanUtilization := math.Float64frombits(w.meanUtilization.Load())
 	w.pidController.Update(pid.AntiWindupControllerInput{
-		ReferenceSignal:  math.Float64frombits(meanUtilization),
+		ReferenceSignal:  meanUtilization,
 		ActualSignal:     utilization,
 		SamplingInterval: time.Since(w.lastUpdated),
 	})
