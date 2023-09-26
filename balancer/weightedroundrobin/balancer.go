@@ -179,7 +179,7 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				cfg: &lbConfig{EnableOOBLoadReport: false},
 				pidController: &pid.AntiWindupController{
 					Config: pid.AntiWindupControllerConfig{
-						ProportionalGain:              1,
+						ProportionalGain:              0.1,
 						IntegralGain:                  0,
 						DerivativeGain:                0,
 						AntiWindUpGain:                0,
@@ -488,12 +488,16 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 		SamplingInterval: time.Since(w.lastUpdated),
 	})
 
-	w.weightVal = w.pidController.State.ControlSignal
-	if w.pidController.State.ControlSignal >= 0 {
-		w.weightVal = 1.0 + w.pidController.State.ControlSignal
-	} else {
-		w.weightVal = -1.0 / (w.pidController.State.ControlSignal - 1.0)
+	if w.weightVal == 0 {
+		w.weightVal = 1
 	}
+	mult := 1.0
+	if w.pidController.State.ControlSignal >= 0 {
+		mult = 1.0 + w.pidController.State.ControlSignal
+	} else {
+		mult = -1.0 / (w.pidController.State.ControlSignal - 1.0)
+	}
+	w.weightVal *= mult
 	w.lastUtilization = utilization
 	//if math.Signbit(meanUtilization-utilization) != math.Signbit(w.pidController.State.ControlSignal) {
 	w.logger.Errorf("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
