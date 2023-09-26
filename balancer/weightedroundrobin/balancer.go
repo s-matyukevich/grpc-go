@@ -179,8 +179,8 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				cfg: &lbConfig{EnableOOBLoadReport: false},
 				pidController: &pid.AntiWindupController{
 					Config: pid.AntiWindupControllerConfig{
-						ProportionalGain:              0.5,
-						IntegralGain:                  0.5,
+						ProportionalGain:              1,
+						IntegralGain:                  1,
 						DerivativeGain:                0,
 						AntiWindUpGain:                0,
 						IntegralDischargeTimeConstant: 30.0,
@@ -500,10 +500,10 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	w.weightVal *= mult
 	w.lastUtilization = utilization
 	//if math.Signbit(meanUtilization-utilization) != math.Signbit(w.pidController.State.ControlSignal) {
-	w.logger.Errorf("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
-	w.logger.Errorf("PID state %+v", w.pidController.State)
-	w.logger.Errorf("Utilization, mean: %v, cur: %v", meanUtilization, utilization)
-	w.logger.Errorf("----------------------------------------------------------------------")
+	// w.logger.Errorf("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
+	// w.logger.Errorf("PID state %+v", w.pidController.State)
+	// w.logger.Errorf("Utilization, mean: %v, cur: %v", meanUtilization, utilization)
+	// w.logger.Errorf("----------------------------------------------------------------------")
 	//}
 
 	w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
