@@ -388,7 +388,7 @@ func (p *picker) updateMeanUtilization() {
 	}
 	mean := 0.0
 	for _, wsc := range p.subConns {
-		mean = wsc.getLastUtilization()
+		mean += wsc.getLastUtilization()
 	}
 	mean /= float64(len(p.subConns))
 	p.meanUtilization.Store(math.Float64bits(mean))
