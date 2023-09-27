@@ -177,16 +177,11 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				// Initially, we set load reports to off, because they are not
 				// running upon initial weightedSubConn creation.
 				cfg: &lbConfig{EnableOOBLoadReport: false},
-				pidController: &pid.AntiWindupController{
-					Config: pid.AntiWindupControllerConfig{
-						ProportionalGain:              1,
-						IntegralGain:                  1,
-						DerivativeGain:                1,
-						AntiWindUpGain:                1,
-						IntegralDischargeTimeConstant: 30.0,
-						LowPassTimeConstant:           1 * time.Second,
-						MinOutput:                     -1,
-						MaxOutput:                     1,
+				pidController: &pid.Controller{
+					Config: pid.ControllerConfig{
+						ProportionalGain: 5,
+						IntegralGain:     0,
+						DerivativeGain:   1,
 					},
 				},
 				meanUtilization: b.meanUtilization,
@@ -446,7 +441,7 @@ type weightedSubConn struct {
 	connectivityState connectivity.State
 	stopORCAListener  func()
 
-	pidController   *pid.AntiWindupController
+	pidController   *pid.Controller
 	meanUtilization *atomic.Uint64
 
 	// The following fields are accessed asynchronously and are protected by
@@ -482,7 +477,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	defer w.mu.Unlock()
 
 	meanUtilization := math.Float64frombits(w.meanUtilization.Load())
-	w.pidController.Update(pid.AntiWindupControllerInput{
+	w.pidController.Update(pid.ControllerInput{
 		ReferenceSignal:  meanUtilization,
 		ActualSignal:     utilization,
 		SamplingInterval: time.Since(w.lastUpdated),
@@ -500,10 +495,10 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	w.weightVal *= mult
 	w.lastUtilization = utilization
 	//if math.Signbit(meanUtilization-utilization) != math.Signbit(w.pidController.State.ControlSignal) {
-	w.logger.Errorf("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
-	w.logger.Errorf("PID state %+v", w.pidController.State)
-	w.logger.Errorf("Utilization, mean: %v, cur: %v", meanUtilization, utilization)
-	w.logger.Errorf("----------------------------------------------------------------------")
+	// w.logger.Errorf("New weight for subchannel %v: %v", w.SubConn, w.weightVal)
+	// w.logger.Errorf("PID state %+v", w.pidController.State)
+	// w.logger.Errorf("Utilization, mean: %v, cur: %v", meanUtilization, utilization)
+	// w.logger.Errorf("----------------------------------------------------------------------")
 	//}
 
 	//w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
