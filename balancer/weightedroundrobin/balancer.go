@@ -55,7 +55,7 @@ type bb struct{}
 
 func (bb) Build(cc balancer.ClientConn, bOpts balancer.BuildOptions) balancer.Balancer {
 	mean := &atomic.Uint64{}
-	mean.Store(math.Float64bits(1.0))
+	mean.Store(math.Float64bits(0))
 	b := &wrrBalancer{
 		cc:                cc,
 		subConns:          resolver.NewAddressMap(),
@@ -477,7 +477,6 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	defer w.mu.Unlock()
 
 	meanUtilization := math.Float64frombits(w.meanUtilization.Load())
-	prevSignal := w.pidController.State.ControlSignal
 	w.pidController.Update(pid.ControllerInput{
 		ReferenceSignal:  meanUtilization,
 		ActualSignal:     utilization,
@@ -488,7 +487,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 		w.weightVal = 1
 	}
 	mult := 1.0
-	signal := prevSignal/2 + w.pidController.State.ControlSignal
+	signal := w.pidController.State.ControlSignal
 	if signal >= 0 {
 		mult = 1.0 + signal
 	} else {
