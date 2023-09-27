@@ -177,16 +177,11 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				// Initially, we set load reports to off, because they are not
 				// running upon initial weightedSubConn creation.
 				cfg: &lbConfig{EnableOOBLoadReport: false},
-				pidController: &pid.AntiWindupController{
-					Config: pid.AntiWindupControllerConfig{
-						ProportionalGain:              2,
-						IntegralGain:                  2,
-						DerivativeGain:                0,
-						AntiWindUpGain:                0,
-						IntegralDischargeTimeConstant: 30.0,
-						LowPassTimeConstant:           1 * time.Second,
-						MinOutput:                     -math.MaxFloat64,
-						MaxOutput:                     math.MaxFloat64,
+				pidController: &pid.Controller{
+					Config: pid.ControllerConfig{
+						ProportionalGain: 2,
+						IntegralGain:     2,
+						DerivativeGain:   0,
 					},
 				},
 				meanUtilization: b.meanUtilization,
@@ -446,7 +441,7 @@ type weightedSubConn struct {
 	connectivityState connectivity.State
 	stopORCAListener  func()
 
-	pidController   *pid.AntiWindupController
+	pidController   *pid.Controller
 	meanUtilization *atomic.Uint64
 
 	// The following fields are accessed asynchronously and are protected by
@@ -482,7 +477,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	defer w.mu.Unlock()
 
 	meanUtilization := math.Float64frombits(w.meanUtilization.Load())
-	w.pidController.Update(pid.AntiWindupControllerInput{
+	w.pidController.Update(pid.ControllerInput{
 		ReferenceSignal:  meanUtilization,
 		ActualSignal:     utilization,
 		SamplingInterval: time.Since(w.lastUpdated),
@@ -506,7 +501,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	// w.logger.Errorf("----------------------------------------------------------------------")
 	//}
 
-	w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
+	//w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
 	w.lastUpdated = internal.TimeNow()
 	if w.nonEmptySince == (time.Time{}) {
 		w.nonEmptySince = w.lastUpdated
