@@ -179,9 +179,9 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				cfg: &lbConfig{EnableOOBLoadReport: false},
 				pidController: &pid.Controller{
 					Config: pid.ControllerConfig{
-						ProportionalGain: 5,
+						ProportionalGain: 4,
 						IntegralGain:     0,
-						DerivativeGain:   1,
+						DerivativeGain:   2,
 					},
 				},
 				meanUtilization: b.meanUtilization,
