@@ -181,7 +181,7 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 					Config: pid.ControllerConfig{
 						ProportionalGain: 2,
 						IntegralGain:     0,
-						DerivativeGain:   2,
+						DerivativeGain:   4,
 					},
 				},
 				meanUtilization: b.meanUtilization,
@@ -477,6 +477,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	defer w.mu.Unlock()
 
 	meanUtilization := math.Float64frombits(w.meanUtilization.Load())
+	prevSignal := w.pidController.State.ControlSignal
 	w.pidController.Update(pid.ControllerInput{
 		ReferenceSignal:  meanUtilization,
 		ActualSignal:     utilization,
@@ -487,10 +488,11 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 		w.weightVal = 1
 	}
 	mult := 1.0
-	if w.pidController.State.ControlSignal >= 0 {
-		mult = 1.0 + w.pidController.State.ControlSignal
+	signal := prevSignal/2 + w.pidController.State.ControlSignal
+	if signal >= 0 {
+		mult = 1.0 + signal
 	} else {
-		mult = -1.0 / (w.pidController.State.ControlSignal - 1.0)
+		mult = -1.0 / (signal - 1.0)
 	}
 	w.weightVal *= mult
 	w.lastUtilization = utilization
