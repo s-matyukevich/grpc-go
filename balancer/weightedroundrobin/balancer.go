@@ -179,8 +179,8 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				cfg: &lbConfig{EnableOOBLoadReport: false},
 				pidController: &pid.AntiWindupController{
 					Config: pid.AntiWindupControllerConfig{
-						ProportionalGain:              1,
-						IntegralGain:                  1,
+						ProportionalGain:              2,
+						IntegralGain:                  2,
 						DerivativeGain:                0,
 						AntiWindUpGain:                0,
 						IntegralDischargeTimeConstant: 30.0,
