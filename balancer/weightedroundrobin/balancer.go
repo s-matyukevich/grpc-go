@@ -179,14 +179,14 @@ func (b *wrrBalancer) updateAddresses(addrs []resolver.Address) {
 				cfg: &lbConfig{EnableOOBLoadReport: false},
 				pidController: &pid.AntiWindupController{
 					Config: pid.AntiWindupControllerConfig{
-						ProportionalGain:              2,
-						IntegralGain:                  2,
-						DerivativeGain:                2,
-						AntiWindUpGain:                0,
+						ProportionalGain:              1,
+						IntegralGain:                  1,
+						DerivativeGain:                1,
+						AntiWindUpGain:                1,
 						IntegralDischargeTimeConstant: 30.0,
 						LowPassTimeConstant:           1 * time.Second,
-						MinOutput:                     -math.MaxFloat64,
-						MaxOutput:                     math.MaxFloat64,
+						MinOutput:                     -1,
+						MaxOutput:                     1,
 					},
 				},
 				meanUtilization: b.meanUtilization,
@@ -506,7 +506,7 @@ func (w *weightedSubConn) OnLoadReport(load *v3orcapb.OrcaLoadReport) {
 	// w.logger.Errorf("----------------------------------------------------------------------")
 	//}
 
-	w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
+	//w.pidController.DischargeIntegral(time.Since(w.lastUpdated))
 	w.lastUpdated = internal.TimeNow()
 	if w.nonEmptySince == (time.Time{}) {
 		w.nonEmptySince = w.lastUpdated
