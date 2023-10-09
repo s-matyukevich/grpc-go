@@ -97,11 +97,11 @@ func NewService(opts ServiceOptions) (*Service, error) {
 	if opts.ServerMetricsProvider == nil {
 		return nil, fmt.Errorf("ServerMetricsProvider not specified")
 	}
-	if !opts.allowAnyMinReportingInterval {
-		if opts.MinReportingInterval < 0 || opts.MinReportingInterval < minReportingInterval {
-			opts.MinReportingInterval = minReportingInterval
-		}
-	}
+	// if !opts.allowAnyMinReportingInterval {
+	// 	if opts.MinReportingInterval < 0 || opts.MinReportingInterval < minReportingInterval {
+	// 		opts.MinReportingInterval = minReportingInterval
+	// 	}
+	// }
 	service := &Service{
 		minReportingInterval: opts.MinReportingInterval,
 		smProvider:           opts.ServerMetricsProvider,
