@@ -552,6 +552,7 @@ type ServerConfig struct {
 	WriteBufferSize       int
 	ReadBufferSize        int
 	SharedWriteBuffer     bool
+	SharedReadBuffer      bool
 	ChannelzParentID      *channelz.Identifier
 	MaxHeaderListSize     *uint32
 	HeaderTableSize       *uint32
@@ -587,6 +588,8 @@ type ConnectOptions struct {
 	ReadBufferSize int
 	// SharedWriteBuffer indicates whether connections should reuse write buffer
 	SharedWriteBuffer bool
+	// SharedReadBuffer indicates whether connections should reuse read buffer
+	SharedReadBuffer bool
 	// ChannelzParentID sets the addrConn id which initiate the creation of this client transport.
 	ChannelzParentID *channelz.Identifier
 	// MaxHeaderListSize sets the max (uncompressed) size of header list that is prepared to be received.

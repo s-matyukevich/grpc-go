@@ -379,6 +379,38 @@ func (w *bufWriter) flushKeepBuffer() error {
 	return w.err
 }
 
+type bufReader struct {
+	pool *sync.Pool
+	buf  *bufio.Reader
+	conn io.Reader
+}
+
+func newBufReader(conn io.Reader, size int, pool *sync.Pool) *bufReader {
+	r := &bufReader{
+		conn: conn,
+		pool: pool,
+	}
+	// this indicates that we should use non shared buf
+	if pool == nil {
+		r.buf = bufio.NewReaderSize(conn, size)
+	}
+	return r
+}
+
+func (r *bufReader) Read(b []byte) (n int,
+	err error) {
+	if r.buf == nil {
+		r.buf = r.pool.Get().(*bufio.Reader)
+		r.buf.Reset(r.conn)
+	}
+	n, err = r.buf.Read(b)
+	if r.buf.Buffered() == 0 && r.pool != nil {
+		r.pool.Put(r.buf)
+		r.buf = nil
+	}
+	return n, err
+}
+
 type ioError struct {
 	error
 }
@@ -405,20 +437,29 @@ type framer struct {
 
 var writeBufferPoolMap map[int]*sync.Pool = make(map[int]*sync.Pool)
 var writeBufferMutex sync.Mutex
+var readBufferPoolMap map[int]*sync.Pool = make(map[int]*sync.Pool)
+var readBufferMutex sync.Mutex
 
-func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, sharedWriteBuffer bool, maxHeaderListSize uint32) *framer {
+func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, sharedWriteBuffer bool, sharedReadBuffer bool, maxHeaderListSize uint32) *framer {
 	if writeBufferSize < 0 {
 		writeBufferSize = 0
 	}
-	var r io.Reader = conn
+
+	writeBufferSize *= 2
+	writePool := getBufferPool(writeBufferPoolMap, &writeBufferMutex, writeBufferSize, sharedWriteBuffer, func() interface{} {
+		b := make([]byte, writeBufferSize)
+		return &b
+	})
+	w := newBufWriter(conn, writeBufferSize, writePool)
+
+	var r io.Reader
 	if readBufferSize > 0 {
-		r = bufio.NewReaderSize(r, readBufferSize)
+		readPool := getBufferPool(readBufferPoolMap, &readBufferMutex, readBufferSize, sharedReadBuffer, func() interface{} {
+			return bufio.NewReaderSize(conn, readBufferSize)
+		})
+		r = newBufReader(conn, readBufferSize, readPool)
 	}
-	var pool *sync.Pool
-	if sharedWriteBuffer {
-		pool = getWriteBufferPool(writeBufferSize)
-	}
-	w := newBufWriter(conn, writeBufferSize, pool)
+
 	f := &framer{
 		writer: w,
 		fr:     http2.NewFramer(w, r),
@@ -432,21 +473,19 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, sharedWriteBu
 	return f
 }
 
-func getWriteBufferPool(writeBufferSize int) *sync.Pool {
-	writeBufferMutex.Lock()
-	defer writeBufferMutex.Unlock()
-	size := writeBufferSize * 2
-	pool, ok := writeBufferPoolMap[size]
-	if ok {
-		return pool
+func getBufferPool(poolMap map[int]*sync.Pool, mutex *sync.Mutex, size int, share bool, f func() interface{}) *sync.Pool {
+	if !share {
+		return nil
 	}
-	pool = &sync.Pool{
-		New: func() any {
-			b := make([]byte, size)
-			return &b
-		},
+	mutex.Lock()
+	defer mutex.Unlock()
+	pool, ok := poolMap[size]
+	if !ok {
+		pool = &sync.Pool{
+			New: f,
+		}
+		poolMap[size] = pool
 	}
-	writeBufferPoolMap[size] = pool
 	return pool
 }
 

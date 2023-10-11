@@ -153,6 +153,20 @@ func WithSharedWriteBuffer(val bool) DialOption {
 	})
 }
 
+// WithSharedReadBuffer allows reusing per-connection transport read buffer.
+// If this option is set to true every connection will release the buffer when
+// it got empty.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func WithSharedReadBuffer(val bool) DialOption {
+	return newFuncDialOption(func(o *dialOptions) {
+		o.copts.SharedReadBuffer = val
+	})
+}
+
 // WithWriteBufferSize determines how much data can be batched before doing a
 // write on the wire. The corresponding memory allocation for this buffer will
 // be twice the size to keep syscalls low. The default value for this buffer is
