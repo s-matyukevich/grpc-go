@@ -415,11 +415,12 @@ func (c *controlBuffer) get(block bool) (any, error) {
 		}
 		c.consumerWaiting = true
 		c.mu.Unlock()
-		select {
-		case <-c.ch:
-		case <-c.done:
-			return nil, errors.New("transport closed by client")
-		}
+		<-c.ch
+		// select {
+		// case :
+		// 	// case <-c.done:
+		// 	// 	return nil, errors.New("transport closed by client")
+		// }
 	}
 }
 
